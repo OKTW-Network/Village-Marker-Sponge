@@ -1,19 +1,14 @@
 package one.oktw.villagemarkersponge
 
 import com.google.inject.Inject
-import net.minecraft.network.INetHandler
-import net.minecraft.network.NetHandlerPlayServer
-import net.minecraftforge.common.MinecraftForge
-import net.minecraftforge.fml.common.Mod
-import net.minecraftforge.fml.common.eventhandler.EventPriority
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
-import net.minecraftforge.fml.common.network.FMLNetworkEvent
 import org.slf4j.Logger
 import org.spongepowered.api.Sponge
 import org.spongepowered.api.entity.living.player.Player
 import org.spongepowered.api.event.Listener
+import org.spongepowered.api.event.filter.cause.Root
 import org.spongepowered.api.event.game.state.GameConstructionEvent
 import org.spongepowered.api.event.game.state.GamePostInitializationEvent
+import org.spongepowered.api.event.network.ChannelRegistrationEvent
 import org.spongepowered.api.event.network.ClientConnectionEvent
 import org.spongepowered.api.network.ChannelBinding
 import org.spongepowered.api.plugin.Plugin
@@ -53,7 +48,7 @@ class Main {
     @Listener
     fun construct(event: GameConstructionEvent) {
         logger.info("Plugin Loaded")
-        MinecraftForge.EVENT_BUS.register(this)
+//        MinecraftForge.EVENT_BUS.register(this)
     }
 
     @Suppress("UNUSED_PARAMETER")
@@ -75,30 +70,6 @@ class Main {
                 .intervalTicks(UPDATE_FREQUENCY_TICKS)
                 .name("Village Marker - service")
                 .submit(this)
-    }
-
-    // TODO: remove this if sponge issue fixed
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    fun onForgeCustomPacketRegister(event: FMLNetworkEvent.CustomPacketRegistrationEvent<INetHandler>) {
-        val channels = event.registrations
-
-        val player = (event.handler as? NetHandlerPlayServer)?.player as? Player ?: return
-
-
-        for (channel in channels) {
-            if (channel == DATA_CHANNEL) {
-                if (compressedPlayers.contains(player)) {
-                    return
-                }
-
-                players.add(player)
-            }
-
-            if (channel == DATA_CHANNEL_COMPRESSED) {
-                players.remove(player)
-                compressedPlayers.add(player)
-            }
-        }
     }
 
     @Listener
@@ -163,24 +134,19 @@ class Main {
         }
     }
 
-// TODO: revert this change if sponge issue fixed
-//    @Listener
-//    fun onRegisterListenChannel(event: ChannelRegistrationEvent.Register, @First player: Player) {
-//        logger.info("$player request channel ${event.channel.length} ${event.channel}")
-//
-//        if (event.channel == "KVM|Data") {
-//            logger.info("add $player to players")
-//            if (compressedPlayers.contains(player)) {
-//                return
-//            }
-//
-//            players.add(player)
-//        }
-//
-//        if (event.channel == "KVM|DataComp") {
-//            logger.info("add $player to compressedPlayers")
-//            players.remove(player)
-//            compressedPlayers.add(player)
-//        }
-//    }
+    @Listener
+    fun onRegisterListenChannel(event: ChannelRegistrationEvent.Register, @Root player: Player) {
+        if (event.channel == "KVM|Data") {
+            if (compressedPlayers.contains(player)) {
+                return
+            }
+
+            players.add(player)
+        }
+
+        if (event.channel == "KVM|DataComp") {
+            players.remove(player)
+            compressedPlayers.add(player)
+        }
+    }
 }
