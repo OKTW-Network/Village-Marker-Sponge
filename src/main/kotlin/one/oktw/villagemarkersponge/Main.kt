@@ -26,6 +26,14 @@ import java.util.zip.Deflater
 import java.util.zip.GZIPOutputStream
 import kotlin.collections.HashMap
 
+private const val UPDATE_FREQUENCY_TICKS: Long = 60
+private const val POLL_CHANNEL = "KVM|Poll"
+private const val ANSWER_CHANNEL = "KVM|Answer"
+private const val DATA_CHANNEL = "KVM|Data"
+private const val DATA_CHANNEL_COMPRESSED = "KVM|DataComp"
+private const val MAX_PACKET_SIZE = 10000
+private const val MAX_PACKET_SIZE_COMPRESSED = 150000
+
 @Mod(
         modid = "villagemarkersponge",
         serverSideOnly = true
@@ -55,11 +63,11 @@ class Main {
     @Suppress("UNUSED_PARAMETER")
     @Listener
     fun postInit(event: GamePostInitializationEvent) {
-        Sponge.getGame().channelRegistrar.getOrCreateRaw(this, "KVM|Poll")
-        Sponge.getGame().channelRegistrar.getOrCreateRaw(this, "KVM|Answer")
+        Sponge.getGame().channelRegistrar.getOrCreateRaw(this, POLL_CHANNEL)
+        Sponge.getGame().channelRegistrar.getOrCreateRaw(this, ANSWER_CHANNEL)
 
-        channel = Sponge.getGame().channelRegistrar.getOrCreateRaw(this, "KVM|Data")
-        channelCompressed = Sponge.getGame().channelRegistrar.getOrCreateRaw(this, "KVM|DataComp")
+        channel = Sponge.getGame().channelRegistrar.getOrCreateRaw(this, DATA_CHANNEL)
+        channelCompressed = Sponge.getGame().channelRegistrar.getOrCreateRaw(this, DATA_CHANNEL_COMPRESSED)
 
         channel.addListener { _, _, _ -> }
         channelCompressed.addListener { _, _, _ -> }
@@ -68,11 +76,12 @@ class Main {
                 .execute { _ ->
                     update()
                 }
-                .intervalTicks(80)
+                .intervalTicks(UPDATE_FREQUENCY_TICKS)
                 .name("Village Marker - service")
                 .submit(this)
     }
 
+    // TODO: remove this if sponge issue fixed
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     fun onForgeCustomPacketRegister(event: FMLNetworkEvent.CustomPacketRegistrationEvent<INetHandler>) {
         val channels = event.registrations
@@ -81,7 +90,7 @@ class Main {
 
 
         for (channel in channels) {
-            if (channel == "KVM|Data") {
+            if (channel == DATA_CHANNEL) {
                 if (compressedPlayers.contains(player)) {
                     return
                 }
@@ -89,7 +98,7 @@ class Main {
                 players.add(player)
             }
 
-            if (channel == "KVM|DataComp") {
+            if (channel == DATA_CHANNEL_COMPRESSED) {
                 players.remove(player)
                 compressedPlayers.add(player)
             }
@@ -116,13 +125,13 @@ class Main {
 
         for (player in players) {
             worlds.computeIfAbsent(player.world) {
-                VillageHelper.getWorldStringList(id, it, 10000)
+                VillageHelper.getWorldStringList(id, it, MAX_PACKET_SIZE)
             }
         }
 
         for (player in compressedPlayers) {
             compressedWorlds.computeIfAbsent(player.world) {
-                VillageHelper.getWorldStringList(id, it, 150000)
+                VillageHelper.getWorldStringList(id, it, MAX_PACKET_SIZE_COMPRESSED)
             }
         }
 
@@ -140,8 +149,6 @@ class Main {
 
         for (player in compressedPlayers) {
             compressedWorlds[player.world]?.forEach { str ->
-                logger.info("sending $str to player ${player.name}")
-
                 val out = ByteArrayOutputStream()
                 val gzip = MyGzipStream(out)
                 gzip.setLevel(Deflater.BEST_COMPRESSION)
@@ -160,17 +167,7 @@ class Main {
         }
     }
 
-// not work due to sponge issue
-//    @Listener
-//    fun onRegisterListenChannelNoFilter(event: ChannelRegistrationEvent.Register) {
-//        logger.info("[unfiltered unnamed] request channel ${event.channel}")
-//
-//        for (i in event.cause) {
-//            logger.info(i.toString())
-//        }
-//        logger.info(event.source.toString())
-//    }
-//
+// TODO: revert this change if sponge issue fixed
 //    @Listener
 //    fun onRegisterListenChannel(event: ChannelRegistrationEvent.Register, @First player: Player) {
 //        logger.info("$player request channel ${event.channel.length} ${event.channel}")
