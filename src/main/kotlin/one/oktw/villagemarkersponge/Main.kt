@@ -34,10 +34,6 @@ private const val DATA_CHANNEL_COMPRESSED = "KVM|DataComp"
 private const val MAX_PACKET_SIZE = 10000
 private const val MAX_PACKET_SIZE_COMPRESSED = 150000
 
-@Mod(
-        modid = "villagemarkersponge",
-        serverSideOnly = true
-)
 @Plugin(
         id = "villagemarkersponge",
         name = "Village Marker for Sponge",
